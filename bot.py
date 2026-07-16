@@ -15,6 +15,13 @@ COURSE_ROLES = {
     "role_ce":  1527340014567161856,
 }
 
+ROLE_LABELS = {
+    "role_it":  "IT",
+    "role_tcm": "TCM",
+    "role_cse": "CSE",
+    "role_ce":  "CE",
+}
+
 # ── KEEP-ALIVE SERVER ────────────────────────────────────
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -44,30 +51,34 @@ async def on_ready():
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type != discord.InteractionType.component:
         return
+
     custom_id = interaction.data.get("custom_id", "")
     if custom_id not in COURSE_ROLES:
         return
 
-    member = interaction.member
-    if not member:
-        await interaction.response.send_message("Error: could not find member.", ephemeral=True)
+    # Get member and guild directly from interaction (no privileged intents needed)
+    member = interaction.user
+    guild  = interaction.guild
+
+    if not member or not guild:
+        await interaction.response.send_message("Error: could not find your profile.", ephemeral=True)
         return
 
-    guild = bot.get_guild(GUILD_ID)
-    all_ids = set(COURSE_ROLES.values())
+    # Remove existing course roles
+    all_ids   = set(COURSE_ROLES.values())
     to_remove = [r for r in member.roles if r.id in all_ids]
     if to_remove:
         await member.remove_roles(*to_remove)
 
+    # Assign new role
     new_role = guild.get_role(COURSE_ROLES[custom_id])
     if new_role:
         await member.add_roles(new_role)
-        labels = {"role_it": "IT", "role_tcm": "TCM", "role_cse": "CSE", "role_ce": "CE"}
         await interaction.response.send_message(
-            f"You got the **{labels[custom_id]}** role!", ephemeral=True
+            f"You got the **{ROLE_LABELS[custom_id]}** role!", ephemeral=True
         )
-        print(f"[Role] {member.display_name} -> {labels[custom_id]}")
+        print(f"[Role] {member.display_name} -> {ROLE_LABELS[custom_id]}")
     else:
-        await interaction.response.send_message("Role not found. Contact admin.", ephemeral=True)
+        await interaction.response.send_message("Role not found. Contact an admin.", ephemeral=True)
 
 bot.run(TOKEN)
