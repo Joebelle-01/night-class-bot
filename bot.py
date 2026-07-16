@@ -5,15 +5,15 @@ import discord
 from discord.ext import commands
 
 # ── CONFIG ──────────────────────────────────────────────
-TOKEN     = os.environ.get("DISCORD_TOKEN")
-GUILD_ID  = int(os.environ.get("GUILD_ID", "1527309915188891789"))
-MEMBER_ROLE_ID = 1527356179704057948  # Unlocks full server access
+TOKEN    = os.environ.get("DISCORD_TOKEN")
+GUILD_ID = int(os.environ.get("GUILD_ID", "1527309915188891789"))
 
-COURSE_ROLES = {
+SELECTOR_ROLES = {
     "role_it":  1527339997802401802,
     "role_tcm": 1527340003758309426,
     "role_cse": 1527340008787415042,
     "role_ce":  1527340014567161856,
+    "role_guest": 1527313017736400978,
 }
 
 ROLE_LABELS = {
@@ -21,6 +21,7 @@ ROLE_LABELS = {
     "role_tcm": "📡 TCM",
     "role_cse": "🖥️ CSE",
     "role_ce":  "⚙️ CE",
+    "role_guest": "👤 Guest",
 }
 
 # ── KEEP-ALIVE SERVER ────────────────────────────────────
@@ -54,7 +55,7 @@ async def on_interaction(interaction: discord.Interaction):
         return
 
     custom_id = interaction.data.get("custom_id", "")
-    if custom_id not in COURSE_ROLES:
+    if custom_id not in SELECTOR_ROLES:
         return
 
     member = interaction.user
@@ -64,26 +65,22 @@ async def on_interaction(interaction: discord.Interaction):
         await interaction.response.send_message("Error: could not find your profile.", ephemeral=True)
         return
 
-    # Remove existing course roles
-    all_course_ids = set(COURSE_ROLES.values())
-    to_remove = [r for r in member.roles if r.id in all_course_ids]
+    # Remove existing selector roles (IT, TCM, CSE, CE, or Guest)
+    all_selector_ids = set(SELECTOR_ROLES.values())
+    to_remove = [r for r in member.roles if r.id in all_selector_ids]
     if to_remove:
         await member.remove_roles(*to_remove)
 
-    # Assign selected course role
-    new_role = guild.get_role(COURSE_ROLES[custom_id])
+    # Assign new role
+    new_role = guild.get_role(SELECTOR_ROLES[custom_id])
     if new_role:
         await member.add_roles(new_role)
-
-    # Assign Member role → unlocks full server access
-    member_role = guild.get_role(MEMBER_ROLE_ID)
-    if member_role and member_role not in member.roles:
-        await member.add_roles(member_role)
-
-    await interaction.response.send_message(
-        f"Welcome! You've been given the **{ROLE_LABELS[custom_id]}** role.\nYou now have full access to the server! 🎉",
-        ephemeral=True
-    )
-    print(f"[Gate] {member.display_name} -> {ROLE_LABELS[custom_id]} + Member")
+        await interaction.response.send_message(
+            f"You got the **{ROLE_LABELS[custom_id]}** role and now have access to the server! 🎉",
+            ephemeral=True
+        )
+        print(f"[Role Selector] {member.display_name} -> {ROLE_LABELS[custom_id]}")
+    else:
+        await interaction.response.send_message("Role not found. Contact an admin.", ephemeral=True)
 
 bot.run(TOKEN)
