@@ -5,8 +5,9 @@ import discord
 from discord.ext import commands
 
 # ── CONFIG ──────────────────────────────────────────────
-TOKEN    = os.environ.get("DISCORD_TOKEN")
-GUILD_ID = int(os.environ.get("GUILD_ID", "1527309915188891789"))
+TOKEN     = os.environ.get("DISCORD_TOKEN")
+GUILD_ID  = int(os.environ.get("GUILD_ID", "1527309915188891789"))
+MEMBER_ROLE_ID = 1527356179704057948  # Unlocks full server access
 
 COURSE_ROLES = {
     "role_it":  1527339997802401802,
@@ -16,10 +17,10 @@ COURSE_ROLES = {
 }
 
 ROLE_LABELS = {
-    "role_it":  "IT",
-    "role_tcm": "TCM",
-    "role_cse": "CSE",
-    "role_ce":  "CE",
+    "role_it":  "💻 IT",
+    "role_tcm": "📡 TCM",
+    "role_cse": "🖥️ CSE",
+    "role_ce":  "⚙️ CE",
 }
 
 # ── KEEP-ALIVE SERVER ────────────────────────────────────
@@ -56,7 +57,6 @@ async def on_interaction(interaction: discord.Interaction):
     if custom_id not in COURSE_ROLES:
         return
 
-    # Get member and guild directly from interaction (no privileged intents needed)
     member = interaction.user
     guild  = interaction.guild
 
@@ -65,20 +65,25 @@ async def on_interaction(interaction: discord.Interaction):
         return
 
     # Remove existing course roles
-    all_ids   = set(COURSE_ROLES.values())
-    to_remove = [r for r in member.roles if r.id in all_ids]
+    all_course_ids = set(COURSE_ROLES.values())
+    to_remove = [r for r in member.roles if r.id in all_course_ids]
     if to_remove:
         await member.remove_roles(*to_remove)
 
-    # Assign new role
+    # Assign selected course role
     new_role = guild.get_role(COURSE_ROLES[custom_id])
     if new_role:
         await member.add_roles(new_role)
-        await interaction.response.send_message(
-            f"You got the **{ROLE_LABELS[custom_id]}** role!", ephemeral=True
-        )
-        print(f"[Role] {member.display_name} -> {ROLE_LABELS[custom_id]}")
-    else:
-        await interaction.response.send_message("Role not found. Contact an admin.", ephemeral=True)
+
+    # Assign Member role → unlocks full server access
+    member_role = guild.get_role(MEMBER_ROLE_ID)
+    if member_role and member_role not in member.roles:
+        await member.add_roles(member_role)
+
+    await interaction.response.send_message(
+        f"Welcome! You've been given the **{ROLE_LABELS[custom_id]}** role.\nYou now have full access to the server! 🎉",
+        ephemeral=True
+    )
+    print(f"[Gate] {member.display_name} -> {ROLE_LABELS[custom_id]} + Member")
 
 bot.run(TOKEN)
