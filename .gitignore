@@ -1,0 +1,6 @@
+flyctl.exe
+flyctl.zip
+wintun.dll
+fly.toml
+__pycache__/
+*.pyc
