@@ -39,7 +39,12 @@ SELECTOR_ROLES = {
     "role_bsetech":1527371320730456184,
     "role_bsesm":  1527371324626833480,
     "role_bsemt":  1527371329215529101,
-    "role_btom":   1527371333581934773,
+    # CSTE programs
+    "role_bssecedmath":    1527719505659170947,
+    "role_bssecedscience": 1527719509472051251,
+    "role_btled":          1527719513691394152,
+    "role_bstvted":        1527719517848076468,
+    # General access
     "role_guest":  1527313017736400978,
 }
 
@@ -51,11 +56,11 @@ ROLE_LABELS = {
     "role_bsece":  "BS Electronics Engineering",
     "role_bsge":   "BS Geodetic Engineering",
     "role_bsme":   "BS Mechanical Engineering",
-    "role_bsmet":  "BS Manufacturing Eng. Technology",
+    "role_bsmet":  "BS Manufacturing Engineering Technology",
     "role_bscs":   "BS Computer Science",
     "role_bsit":   "BS Information Technology",
     "role_bsds":   "BS Data Science",
-    "role_bstcm":  "BS Tech. Communication Management",
+    "role_bstcm":  "BS Technology Communication Management",
     "role_bsam":   "BS Applied Mathematics",
     "role_bsap":   "BS Applied Physics",
     "role_bschem": "BS Chemistry",
@@ -65,7 +70,12 @@ ROLE_LABELS = {
     "role_bsetech":"BS Electronics Technology",
     "role_bsesm":  "BS Energy Systems and Management",
     "role_bsemt":  "BS Electro-Mechanical Technology",
-    "role_btom":   "Bachelor of Technology, Operations, and Management",
+    # CSTE
+    "role_bssecedmath":    "BS Secondary Education (Mathematics)",
+    "role_bssecedscience": "BS Secondary Education (Science)",
+    "role_btled":          "BTLEd",
+    "role_bstvted":        "BTVTEd",
+    # General
     "role_guest":  "Guest",
 }
 
@@ -73,6 +83,7 @@ ROLE_LABELS = {
 # Maps each program role key → the college umbrella role NAME in your server
 # Guest gets Verified but no college role
 PROGRAM_TO_COLLEGE = {
+    # CEA
     "role_bsa":    "CEA",
     "role_bsce":   "CEA",
     "role_bscpe":  "CEA",
@@ -80,26 +91,34 @@ PROGRAM_TO_COLLEGE = {
     "role_bsece":  "CEA",
     "role_bsge":   "CEA",
     "role_bsme":   "CEA",
-    "role_bsmet":  "CEA",
+    # CITC
     "role_bscs":   "CITC",
     "role_bsit":   "CITC",
     "role_bsds":   "CITC",
     "role_bstcm":  "CITC",
+    # CSM
     "role_bsam":   "CSM",
     "role_bsap":   "CSM",
     "role_bschem": "CSM",
     "role_bses":   "CSM",
+    # COT (BSMET moved here from CEA)
     "role_bsft":   "COT",
     "role_bsauto": "COT",
     "role_bsetech":"COT",
     "role_bsesm":  "COT",
     "role_bsemt":  "COT",
-    "role_btom":   "COT",
-    "role_guest":  None,   # Guests get Verified only, no college role
+    "role_bsmet":  "COT",
+    # CSTE
+    "role_bssecedmath":    "CSTE",
+    "role_bssecedscience": "CSTE",
+    "role_btled":          "CSTE",
+    "role_bstvted":        "CSTE",
+    # Guest — no college role
+    "role_guest":  None,
 }
 
 # All college role names (used for explicit denies in academic categories)
-COLLEGE_ROLE_NAMES = ["CEA", "CITC", "CSM", "COT"]
+COLLEGE_ROLE_NAMES = ["CEA", "CITC", "CSM", "CSTE", "COT"]
 
 # ── CHANNEL → PROGRAM ROLE MAPPING ──────────────────────
 # Maps a keyword found in a channel name → the program role key in SELECTOR_ROLES.
@@ -131,7 +150,12 @@ CHANNEL_TO_PROGRAM = {
     "electronics-tech":    "role_bsetech",
     "energy-systems":      "role_bsesm",
     "electro-mechanical":  "role_bsemt",
-    "btom":                "role_btom",
+    "manufacturing":       "role_bsmet",
+    # CSTE
+    "secondary-education-math":    "role_bssecedmath",
+    "secondary-education-science": "role_bssecedscience",
+    "btled":               "role_btled",
+    "btvted":              "role_bstvted",
 }
 
 def get_program_role_for_channel(guild: discord.Guild, channel_name: str, target_college: str | None = None) -> discord.Role | None:
@@ -173,6 +197,7 @@ CATEGORY_CONFIG = [
     ("cea",               "academic", "CEA"),
     ("citc",              "academic", "CITC"),
     ("csm",               "academic", "CSM"),
+    ("cste",              "academic", "CSTE"),
     ("cot",               "academic", "COT"),
     ("staff",             "staff",    None),
 ]
