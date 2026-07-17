@@ -156,6 +156,38 @@ async def on_ready():
         for role in reversed(guild.roles):
             print(f"Position {role.position}: {role.name} (ID: {role.id})")
         print("---------------------------------------------------\n")
+        
+        # Automatically fix channel permissions on startup
+        print("Starting auto-configuration of channel permissions...")
+        everyone = guild.default_role
+        for category in guild.categories:
+            role_key = find_matching_role_key(category.name)
+            if role_key:
+                role_id = SELECTOR_ROLES[role_key]
+                role = guild.get_role(role_id)
+                if role:
+                    try:
+                        overwrites = category.overwrites.copy()
+                        
+                        everyone_overwrite = overwrites.get(everyone, discord.PermissionOverwrite())
+                        everyone_overwrite.view_channel = False
+                        overwrites[everyone] = everyone_overwrite
+                        
+                        role_overwrite = overwrites.get(role, discord.PermissionOverwrite())
+                        role_overwrite.view_channel = True
+                        overwrites[role] = role_overwrite
+                        
+                        await category.edit(overwrites=overwrites)
+                        print(f"[Auto-Permissions] Configured category {category.name} for role {role.name}")
+                        
+                        for channel in category.channels:
+                            try:
+                                await channel.edit(sync_permissions=True)
+                            except Exception as ch_err:
+                                print(f"[Auto-Permissions] Error syncing channel {channel.name}: {ch_err}")
+                    except Exception as e:
+                        print(f"[Auto-Permissions] Failed to configure category {category.name}: {e}")
+        print("Auto-configuration of channel permissions complete.")
     else:
         print(f"\n[Warning] Guild with ID {GUILD_ID} not found or bot is not in it.\n")
 
