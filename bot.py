@@ -102,26 +102,39 @@ PROGRAM_TO_COLLEGE = {
 COLLEGE_ROLE_NAMES = ["CEA", "CITC", "CSM", "COT"]
 
 # ── CATEGORY PERMISSION CONFIG ───────────────────────────
-# Maps category name (case-insensitive) → permission type:
-#   "public"   – @everyone can view (pre-verification channels live here)
+# Maps a keyword (found anywhere in the category name, case-insensitive)
+# → permission type. This handles emoji-prefixed names like "📋・INFORMATION".
+# The bot checks each category name for these keywords in ORDER — first match wins.
+# Keep more specific keywords BEFORE broader ones.
+#
+# Types:
 #   "shared"   – Verified + Staff + Mod + Admin only
 #   "academic" – Verified + matching college role + Staff + Mod + Admin
 #                (rival college roles are explicitly denied)
 #   "staff"    – Staff + Mod + Admin only
 #
-# The "college" key is only used for "academic" type entries.
-CATEGORY_CONFIG = {
-    "information":           {"type": "shared"},
-    "study vc rooms":        {"type": "shared"},
-    "general":               {"type": "shared"},
-    "gaming":                {"type": "shared"},
-    "gaming voice channels": {"type": "shared"},
-    "cea":                   {"type": "academic", "college": "CEA"},
-    "citc":                  {"type": "academic", "college": "CITC"},
-    "csm":                   {"type": "academic", "college": "CSM"},
-    "cot":                   {"type": "academic", "college": "COT"},
-    "staff":                 {"type": "staff"},
-}
+CATEGORY_CONFIG = [
+    # keyword              type        college (only for academic)
+    ("information",       "shared",   None),
+    ("study vc",          "shared",   None),
+    ("general",           "shared",   None),
+    ("gaming voice",      "shared",   None),   # must come BEFORE plain "gaming"
+    ("gaming",            "shared",   None),
+    ("academics",         "shared",   None),   # the overall academics hub category
+    ("cea",               "academic", "CEA"),
+    ("citc",              "academic", "CITC"),
+    ("csm",               "academic", "CSM"),
+    ("cot",               "academic", "COT"),
+    ("staff",             "staff",    None),
+]
+
+def get_category_config(category_name: str):
+    """Return (type, college) for a category by keyword-matching its name."""
+    name_lower = category_name.lower()
+    for keyword, cat_type, college in CATEGORY_CONFIG:
+        if keyword in name_lower:
+            return cat_type, college
+    return None, None
 
 # ── GEMINI AI SETUP ──────────────────────────────────────
 if GEMINI_KEY:
@@ -165,18 +178,16 @@ def get_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
 # ── PERMISSION ENGINE ────────────────────────────────────
 async def configure_category_permissions(guild: discord.Guild, category: discord.CategoryChannel) -> tuple[bool, str]:
     """
-    Applies permission overwrites to a category based on CATEGORY_CONFIG.
+    Applies permission overwrites to a category based on CATEGORY_CONFIG keyword matching.
+    Handles emoji-prefixed names like '📋・INFORMATION' or '💻・CITC'.
     All child channels are synced to inherit the category permissions.
 
     Returns (success: bool, message: str)
     """
-    key = category.name.strip().lower()
-    config = CATEGORY_CONFIG.get(key)
+    cat_type, college = get_category_config(category.name)
 
-    if config is None:
-        return False, f"Category '{category.name}' is not in CATEGORY_CONFIG — skipped."
-
-    cat_type = config["type"]
+    if cat_type is None:
+        return False, f"Category '{category.name}' did not match any config keyword — skipped."
     everyone  = guild.default_role
 
     # Resolve the special roles we need
@@ -211,7 +222,7 @@ async def configure_category_permissions(guild: discord.Guild, category: discord
         # Matching college role allowed
         # All OTHER college roles explicitly denied
         # Staff + Mod + Admin allowed
-        target_college_name = config["college"]
+        target_college_name = college
         overwrites[everyone] = discord.PermissionOverwrite(view_channel=False)
 
         if verified_role:
