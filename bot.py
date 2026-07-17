@@ -582,6 +582,125 @@ async def on_message(message: discord.Message):
             await message.channel.send(response_text)
         return
 
+    # ── !sendselector ──────────────────────────────────────
+    if content.startswith("!sendselector") or content.startswith("!send_selector"):
+        member   = message.author
+        is_admin = member.guild_permissions.administrator or member.id == message.guild.owner_id
+        if not is_admin:
+            await message.channel.send("❌ Sorry, only administrators can run this command.")
+            return
+
+        try:
+            await message.delete()
+        except Exception:
+            pass
+
+        # 1. CEA Embed & View
+        cea_embed = discord.Embed(
+            title="📐 CEA Department Roles",
+            description="Select your program below to unlock your course channel and the rest of the server:\n\n"
+                        "📐 **BSA** — BS Architecture\n"
+                        "🏗️ **BSCE** — BS Civil Engineering\n"
+                        "⚙️ **BSCpE** — BS Computer Engineering\n"
+                        "⚡ **BSEE** — BS Electrical Engineering\n"
+                        "📡 **BSECE** — BS Electronics Engineering\n"
+                        "🗺️ **BSGE** — BS Geodetic Engineering\n"
+                        "🛠️ **BSME** — BS Mechanical Engineering",
+            color=discord.Color.blue()
+        )
+        cea_view = discord.ui.View(timeout=None)
+        cea_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSA", custom_id="role_bsa", emoji="📐"))
+        cea_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSCE", custom_id="role_bsce", emoji="🏗️"))
+        cea_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSCpE", custom_id="role_bscpe", emoji="⚙️"))
+        cea_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSEE", custom_id="role_bsee", emoji="⚡"))
+        cea_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSECE", custom_id="role_bsece", emoji="📡"))
+        cea_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSGE", custom_id="role_bsge", emoji="🗺️"))
+        cea_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSME", custom_id="role_bsme", emoji="🛠️"))
+        await message.channel.send(embed=cea_embed, view=cea_view)
+
+        # 2. CITC Embed & View
+        citc_embed = discord.Embed(
+            title="💻 CITC Department Roles",
+            description="Select your program below to unlock your course channel and the rest of the server:\n\n"
+                        "🖥️ **BSCS** — BS Computer Science\n"
+                        "📊 **BSDS** — BS Data Science\n"
+                        "💻 **BSIT** — BS Information Technology\n"
+                        "🎙️ **BSTCM** — BS Technology Communication Management",
+            color=discord.Color.blue()
+        )
+        citc_view = discord.ui.View(timeout=None)
+        citc_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSCS", custom_id="role_bscs", emoji="🖥️"))
+        citc_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSDS", custom_id="role_bsds", emoji="📊"))
+        citc_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSIT", custom_id="role_bsit", emoji="💻"))
+        citc_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSTCM", custom_id="role_bstcm", emoji="🎙️"))
+        await message.channel.send(embed=citc_embed, view=citc_view)
+
+        # 3. COT Embed & View
+        cot_embed = discord.Embed(
+            title="⚙️ COT Department Roles",
+            description="Select your program below to unlock your course channel and the rest of the server:\n\n"
+                        "🚗 **BSAuto** — BS Autotronics\n"
+                        "🔌 **BSETech** — BS Electronics Technology\n"
+                        "🔋 **BSESM** — BS Energy Systems and Management\n"
+                        "🤖 **BSEMT** — BS Electro-Mechanical Technology\n"
+                        "🍎 **BSFT** — BS Food Technology\n"
+                        "🏭 **BSMET** — BS Manufacturing Engineering Technology",
+            color=discord.Color.blue()
+        )
+        cot_view = discord.ui.View(timeout=None)
+        cot_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSAuto", custom_id="role_bsauto", emoji="🚗"))
+        cot_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSETech", custom_id="role_bsetech", emoji="🔌"))
+        cot_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSESM", custom_id="role_bsesm", emoji="🔋"))
+        cot_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSEMT", custom_id="role_bsemt", emoji="🤖"))
+        cot_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSFT", custom_id="role_bsft", emoji="🍎"))
+        cot_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSMET", custom_id="role_bsmet", emoji="🏭"))
+        await message.channel.send(embed=cot_embed, view=cot_view)
+
+        # 4. CSM Embed & View
+        csm_embed = discord.Embed(
+            title="🔬 CSM Department Roles",
+            description="Select your program below to unlock your course channel and the rest of the server:\n\n"
+                        "🧮 **BSAM** — BS Applied Mathematics\n"
+                        "⚛️ **BSAP** — BS Applied Physics\n"
+                        "🧪 **BSChem** — BS Chemistry\n"
+                        "🌱 **BSES** — BS Environmental Science",
+            color=discord.Color.blue()
+        )
+        csm_view = discord.ui.View(timeout=None)
+        csm_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSAM", custom_id="role_bsam", emoji="🧮"))
+        csm_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSAP", custom_id="role_bsap", emoji="⚛️"))
+        csm_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSChem", custom_id="role_bschem", emoji="🧪"))
+        csm_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSES", custom_id="role_bses", emoji="🌱"))
+        await message.channel.send(embed=csm_embed, view=csm_view)
+
+        # 5. CSTE Embed & View
+        cste_embed = discord.Embed(
+            title="📚 CSTE Department Roles",
+            description="Select your program below to unlock your course channel and the rest of the server:\n\n"
+                        "🧮 **BSEd-Math** — BS Secondary Education (Mathematics)\n"
+                        "⚛️ **BSEd-Sci** — BS Secondary Education (Science)\n"
+                        "🍎 **BTLEd** — Bachelor of Technology and Livelihood Education\n"
+                        "🛠️ **BTVTEd** — Bachelor of Technical-Vocational Teacher Education",
+            color=discord.Color.blue()
+        )
+        cste_view = discord.ui.View(timeout=None)
+        cste_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSEd-Math", custom_id="role_bssecedmath", emoji="🧮"))
+        cste_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BSEd-Sci", custom_id="role_bssecedscience", emoji="⚛️"))
+        cste_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BTLEd", custom_id="role_btled", emoji="🍎"))
+        cste_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="BTVTEd", custom_id="role_bstvted", emoji="🛠️"))
+        await message.channel.send(embed=cste_embed, view=cste_view)
+
+        # 6. Guest Access Embed & View
+        guest_embed = discord.Embed(
+            title="👤 Guest Access",
+            description="If you do not belong to any of the specific courses listed above, or are a visitor/friend, please select the Guest role to unlock general server channels.",
+            color=discord.Color.light_grey()
+        )
+        guest_view = discord.ui.View(timeout=None)
+        guest_view.add_item(discord.ui.Button(style=discord.ButtonStyle.secondary, label="Guest", custom_id="role_guest", emoji="👤"))
+        await message.channel.send(embed=guest_embed, view=guest_view)
+        return
+
     # ── !unlockcategory ─────────────────────────────────────
     if content.startswith("!unlockcategory") or content.startswith("!unlock_category"):
         member   = message.author
