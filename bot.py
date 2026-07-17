@@ -101,6 +101,49 @@ PROGRAM_TO_COLLEGE = {
 # All college role names (used for explicit denies in academic categories)
 COLLEGE_ROLE_NAMES = ["CEA", "CITC", "CSM", "COT"]
 
+# ── CHANNEL → PROGRAM ROLE MAPPING ──────────────────────
+# Maps a keyword found in a channel name → the program role key in SELECTOR_ROLES.
+# Used to grant per-channel send_messages rights inside academic categories.
+# Each program member can VIEW all channels in their college, but only SEND in theirs.
+CHANNEL_TO_PROGRAM = {
+    # CEA
+    "architecture":        "role_bsa",
+    "civil":               "role_bsce",
+    "computer-eng":        "role_bscpe",
+    "electrical":          "role_bsee",
+    "electronics-eng":     "role_bsece",
+    "geodetic":            "role_bsge",
+    "mechanical":          "role_bsme",
+    "manufacturing":       "role_bsmet",
+    # CITC
+    "computer-science":    "role_bscs",
+    "information-tech":    "role_bsit",
+    "data-science":        "role_bsds",
+    "tech-comm":           "role_bstcm",
+    # CSM
+    "applied-math":        "role_bsam",
+    "applied-physics":     "role_bsap",
+    "chemistry":           "role_bschem",
+    "environmental":       "role_bses",
+    # COT
+    "food-tech":           "role_bsft",
+    "autotronics":         "role_bsauto",
+    "electronics-tech":    "role_bsetech",
+    "energy-systems":      "role_bsesm",
+    "electro-mechanical":  "role_bsemt",
+    "btom":                "role_btom",
+}
+
+def get_program_role_for_channel(guild: discord.Guild, channel_name: str) -> discord.Role | None:
+    """Return the program role that owns this channel, or None if not matched."""
+    name_lower = channel_name.lower()
+    for keyword, role_key in CHANNEL_TO_PROGRAM.items():
+        if keyword in name_lower:
+            role_id = SELECTOR_ROLES.get(role_key)
+            if role_id:
+                return guild.get_role(role_id)
+    return None
+
 # ── CATEGORY PERMISSION CONFIG ───────────────────────────
 # Maps a keyword (found anywhere in the category name, case-insensitive)
 # → permission type. This handles emoji-prefixed names like "📋・INFORMATION".
@@ -217,33 +260,40 @@ async def configure_category_permissions(guild: discord.Guild, category: discord
             overwrites[admin_role] = discord.PermissionOverwrite(view_channel=True)
 
     elif cat_type == "academic":
-        # @everyone denied
-        # Verified allowed
-        # Matching college role allowed
-        # All OTHER college roles explicitly denied
-        # Staff + Mod + Admin allowed
+        # ACCESS RULES for academic categories:
+        # - @everyone           → view DENIED
+        # - Verified            → NO override (Verified alone does NOT grant academic access)
+        # - Matching college    → view ALLOWED, send DENIED at category level
+        # - Rival college roles → view DENIED
+        # - Staff / Mod / Admin → view + send ALLOWED
+        #
+        # Per-channel: the matching PROGRAM role gets send_messages=True
+        # so each member can only type in their own program channel.
         target_college_name = college
         overwrites[everyone] = discord.PermissionOverwrite(view_channel=False)
 
-        if verified_role:
-            overwrites[verified_role] = discord.PermissionOverwrite(view_channel=True)
+        # NOTE: Verified intentionally NOT added here.
+        # Academic access is gated on the college role only.
 
         for college_name, college_role in college_roles.items():
             if college_role is None:
                 print(f"[Permissions] Warning: Role '{college_name}' not found in guild.")
                 continue
             if college_name == target_college_name:
-                overwrites[college_role] = discord.PermissionOverwrite(view_channel=True)
+                # Can VIEW all channels in this college; send is denied at category level
+                overwrites[college_role] = discord.PermissionOverwrite(
+                    view_channel=True, send_messages=False
+                )
             else:
                 # Explicitly deny rival college roles
                 overwrites[college_role] = discord.PermissionOverwrite(view_channel=False)
 
         if staff_role:
-            overwrites[staff_role] = discord.PermissionOverwrite(view_channel=True)
+            overwrites[staff_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
         if mod_role:
-            overwrites[mod_role] = discord.PermissionOverwrite(view_channel=True)
+            overwrites[mod_role]   = discord.PermissionOverwrite(view_channel=True, send_messages=True)
         if admin_role:
-            overwrites[admin_role] = discord.PermissionOverwrite(view_channel=True)
+            overwrites[admin_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
     elif cat_type == "staff":
         # @everyone denied; Verified denied; Staff + Mod + Admin allowed
@@ -251,11 +301,11 @@ async def configure_category_permissions(guild: discord.Guild, category: discord
         if verified_role:
             overwrites[verified_role] = discord.PermissionOverwrite(view_channel=False)
         if staff_role:
-            overwrites[staff_role] = discord.PermissionOverwrite(view_channel=True)
+            overwrites[staff_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
         if mod_role:
-            overwrites[mod_role] = discord.PermissionOverwrite(view_channel=True)
+            overwrites[mod_role]   = discord.PermissionOverwrite(view_channel=True, send_messages=True)
         if admin_role:
-            overwrites[admin_role] = discord.PermissionOverwrite(view_channel=True)
+            overwrites[admin_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
     else:
         return False, f"Unknown category type '{cat_type}' for '{category.name}'."
@@ -263,16 +313,41 @@ async def configure_category_permissions(guild: discord.Guild, category: discord
     try:
         await category.edit(overwrites=overwrites)
 
-        # Sync all child channels to inherit the category overwrites
-        synced_count = 0
-        for channel in category.channels:
-            try:
-                await channel.edit(sync_permissions=True)
-                synced_count += 1
-            except Exception as ch_err:
-                print(f"[Permissions] Error syncing channel {channel.name}: {ch_err}")
+        synced_count   = 0
+        skipped_count  = 0
 
-        return True, f"✅ **{category.name}** ({cat_type}) — {synced_count} channel(s) synced."
+        if cat_type == "academic":
+            # Academic channels: do NOT sync (we apply per-channel send overrides).
+            # Each channel gets send_messages=True ONLY for its matching program role.
+            for channel in category.channels:
+                try:
+                    program_role = get_program_role_for_channel(guild, channel.name)
+                    # Build per-channel overwrites: start from category overwrites
+                    ch_overwrites = dict(overwrites)  # copy category overwrites
+                    if program_role:
+                        # Only this program's members can send here
+                        ch_overwrites[program_role] = discord.PermissionOverwrite(
+                            view_channel=True, send_messages=True
+                        )
+                        print(f"  [Channel] #{channel.name} → send allowed for '{program_role.name}'")
+                    else:
+                        print(f"  [Channel] #{channel.name} → no program role matched (view-only for all)")
+                    await channel.edit(overwrites=ch_overwrites)
+                    synced_count += 1
+                except Exception as ch_err:
+                    print(f"[Permissions] Error configuring #{channel.name}: {ch_err}")
+                    skipped_count += 1
+        else:
+            # Shared / staff / public: just sync all channels to the category
+            for channel in category.channels:
+                try:
+                    await channel.edit(sync_permissions=True)
+                    synced_count += 1
+                except Exception as ch_err:
+                    print(f"[Permissions] Error syncing #{channel.name}: {ch_err}")
+                    skipped_count += 1
+
+        return True, f"✅ **{category.name}** ({cat_type}) — {synced_count} channel(s) configured."
     except Exception as e:
         return False, f"❌ Failed to configure **{category.name}**: {e}"
 
