@@ -158,7 +158,7 @@ def get_program_role_for_channel(guild: discord.Guild, channel_name: str) -> dis
 #
 CATEGORY_CONFIG = [
     # keyword              type        college (only for academic)
-    ("information",       "shared",   None),
+    ("information",       "info",     None),   # read-only for members; only Mod+Admin can post
     ("study vc",          "shared",   None),
     ("general",           "shared",   None),
     ("gaming voice",      "shared",   None),   # must come BEFORE plain "gaming"
@@ -246,6 +246,19 @@ async def configure_category_permissions(guild: discord.Guild, category: discord
     if cat_type == "public":
         # @everyone can view but not send messages
         overwrites[everyone] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
+
+    elif cat_type == "info":
+        # INFORMATION category — read-only for all members.
+        # Only Moderator and Admin can post. Verified/Staff can only read.
+        overwrites[everyone] = discord.PermissionOverwrite(view_channel=False)
+        if verified_role:
+            overwrites[verified_role] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
+        if staff_role:
+            overwrites[staff_role]    = discord.PermissionOverwrite(view_channel=True, send_messages=False)
+        if mod_role:
+            overwrites[mod_role]      = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        if admin_role:
+            overwrites[admin_role]    = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
     elif cat_type == "shared":
         # @everyone denied; Verified + Staff + Mod + Admin allowed
