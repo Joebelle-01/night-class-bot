@@ -134,11 +134,17 @@ CHANNEL_TO_PROGRAM = {
     "btom":                "role_btom",
 }
 
-def get_program_role_for_channel(guild: discord.Guild, channel_name: str) -> discord.Role | None:
-    """Return the program role that owns this channel, or None if not matched."""
+def get_program_role_for_channel(guild: discord.Guild, channel_name: str, target_college: str | None = None) -> discord.Role | None:
+    """Return the program role that owns this channel, or None if not matched.
+    If target_college is given, only match roles that belong to that college.
+    This prevents e.g. BSFT getting view access inside CSM.
+    """
     name_lower = channel_name.lower()
     for keyword, role_key in CHANNEL_TO_PROGRAM.items():
         if keyword in name_lower:
+            # If a college filter is set, skip roles from the wrong college
+            if target_college and PROGRAM_TO_COLLEGE.get(role_key) != target_college:
+                continue
             role_id = SELECTOR_ROLES.get(role_key)
             if role_id:
                 return guild.get_role(role_id)
@@ -335,7 +341,7 @@ async def configure_category_permissions(guild: discord.Guild, category: discord
             # Each channel gets send_messages=True ONLY for its matching program role.
             for channel in category.channels:
                 try:
-                    program_role = get_program_role_for_channel(guild, channel.name)
+                    program_role = get_program_role_for_channel(guild, channel.name, target_college_name)
                     # Build per-channel overwrites: start from category overwrites
                     ch_overwrites = dict(overwrites)  # copy category overwrites
                     if program_role:
