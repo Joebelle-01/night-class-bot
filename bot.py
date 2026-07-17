@@ -107,6 +107,15 @@ SPAM_WINDOW = 3.0  # seconds
 @bot.event
 async def on_ready():
     print(f"Bot online: {bot.user}")
+    # Print all roles and their hierarchy positions to assist debugging
+    guild = bot.get_guild(GUILD_ID)
+    if guild:
+        print(f"\n--- Roles in Guild: {guild.name} ({guild.id}) ---")
+        for role in reversed(guild.roles):
+            print(f"Position {role.position}: {role.name} (ID: {role.id})")
+        print("---------------------------------------------------\n")
+    else:
+        print(f"\n[Warning] Guild with ID {GUILD_ID} not found or bot is not in it.\n")
 
 # ── BUTTON ROLE SWAPPER ──────────────────────────────────
 @bot.event
@@ -125,23 +134,33 @@ async def on_interaction(interaction: discord.Interaction):
         await interaction.response.send_message("Error: could not find your profile.", ephemeral=True)
         return
 
-    # Remove existing selector roles
+    # Remove existing selector roles and add the new one atomically
     all_selector_ids = set(SELECTOR_ROLES.values())
-    to_remove = [r for r in member.roles if r.id in all_selector_ids]
-    if to_remove:
-        await member.remove_roles(*to_remove)
+    new_roles = [r for r in member.roles if r.id not in all_selector_ids]
 
-    # Assign new role
     new_role = guild.get_role(SELECTOR_ROLES[custom_id])
-    if new_role:
-        await member.add_roles(new_role)
+    if not new_role:
+        await interaction.response.send_message("Role not found in the server. Please contact an admin.", ephemeral=True)
+        return
+
+    new_roles.append(new_role)
+
+    try:
+        await member.edit(roles=new_roles)
         await interaction.response.send_message(
             f"You got the **{ROLE_LABELS[custom_id]}** role and now have access to the server! 🎉",
             ephemeral=True
         )
         print(f"[Role Selector] {member.display_name} -> {ROLE_LABELS[custom_id]}")
-    else:
-        await interaction.response.send_message("Role not found. Contact an admin.", ephemeral=True)
+    except discord.Forbidden:
+        await interaction.response.send_message(
+            "❌ Error: I do not have permission to manage this role. Please ask an administrator to move my bot's role ABOVE the program roles in Server Settings.",
+            ephemeral=True
+        )
+        print(f"[Role Selector Error] Cannot manage role {new_role.name} due to hierarchy limitations.")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error updating roles: {e}", ephemeral=True)
+        print(f"[Role Selector Error] {e}")
 
 # ── MESSAGE MODERATION & AI COMMANDS ─────────────────────
 @bot.event
@@ -240,44 +259,61 @@ async def on_message(message: discord.Message):
                     action_type = act.get("action")
                     
                     if action_type == "send_message":
-                        target_ch = message.guild.get_channel(int(act.get("channel_id")))
-                        if target_ch:
-                            await target_ch.send(act.get("content"))
+                        ch_id = act.get("channel_id")
+                        if ch_id is not None:
+                            target_ch = message.guild.get_channel(int(ch_id))
+                            if target_ch:
+                                await target_ch.send(act.get("content"))
 
                     elif action_type == "lock_channel":
-                        target_ch = message.guild.get_channel(int(act.get("channel_id")))
-                        if target_ch:
-                            # Deny Send Messages override for @everyone
-                            everyone = message.guild.default_role
-                            await target_ch.set_permissions(everyone, send_messages=False)
+                        ch_id = act.get("channel_id")
+                        if ch_id is not None:
+                            target_ch = message.guild.get_channel(int(ch_id))
+                            if target_ch:
+                                # Deny Send Messages override for @everyone
+                                everyone = message.guild.default_role
+                                await target_ch.set_permissions(everyone, send_messages=False)
 
                     elif action_type == "unlock_channel":
-                        target_ch = message.guild.get_channel(int(act.get("channel_id")))
-                        if target_ch:
-                            # Reset override
-                            everyone = message.guild.default_role
-                            await target_ch.set_permissions(everyone, send_messages=None)
+                        ch_id = act.get("channel_id")
+                        if ch_id is not None:
+                            target_ch = message.guild.get_channel(int(ch_id))
+                            if target_ch:
+                                # Reset override
+                                everyone = message.guild.default_role
+                                await target_ch.set_permissions(everyone, send_messages=None)
 
                     elif action_type == "clear_messages":
-                        target_ch = message.guild.get_channel(int(act.get("channel_id")))
-                        if target_ch:
-                            count = int(act.get("count", 10))
-                            await target_ch.purge(limit=count + 1) # include command message if current
+                        ch_id = act.get("channel_id")
+                        if ch_id is not None:
+                            target_ch = message.guild.get_channel(int(ch_id))
+                            if target_ch:
+                                count = int(act.get("count", 10))
+                                await target_ch.purge(limit=count + 1) # include command message if current
 
                     elif action_type == "mute_member":
-                        target_member = message.guild.get_member(int(act.get("member_id")))
-                        duration = int(act.get("duration_minutes", 10))
-                        if target_member:
-                            until = discord.utils.utcnow() + discord.utils.datetime.timedelta(minutes=duration)
-                            await target_member.timeout(until, reason="AI Moderator Command")
+                        mem_id = act.get("member_id")
+                        if mem_id is not None:
+                            target_member = message.guild.get_member(int(mem_id))
+                            duration = int(act.get("duration_minutes", 10))
+                            if target_member:
+                                until = discord.utils.utcnow() + discord.utils.datetime.timedelta(minutes=duration)
+                                await target_member.timeout(until, reason="AI Moderator Command")
 
                     elif action_type == "unmute_member":
-                        target_member = message.guild.get_member(int(act.get("member_id")))
-                        if target_member:
-                            await target_member.timeout(None, reason="AI Moderator Command")
+                        mem_id = act.get("member_id")
+                        if mem_id is not None:
+                            target_member = message.guild.get_member(int(mem_id))
+                            if target_member:
+                                await target_member.timeout(None, reason="AI Moderator Command")
 
             except Exception as e:
-                print(f"[AI Error] {e}")
-                await message.channel.send("⚠️ Error: I encountered an issue processing your request.")
+                import traceback
+                tb = traceback.format_exc()
+                print(f"[AI Error] {tb}")
+                error_msg = f"⚠️ Error: I encountered an issue processing your request.\n```python\n{tb}\n```"
+                if len(error_msg) > 2000:
+                    error_msg = error_msg[:1990] + "\n```"
+                await message.channel.send(error_msg)
 
 bot.run(TOKEN)
