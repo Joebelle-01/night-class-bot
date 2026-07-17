@@ -243,16 +243,24 @@ async def on_message(message: discord.Message):
             prompt = f"System:\n{system_instruction}\n\nUser Request & Context:\n{json.dumps(context)}"
 
             try:
-                # Generate AI response using new SDK
+                # Generate AI response using new SDK (removed response_mime_type for v1 compatibility)
                 response = await asyncio.to_thread(
                     ai_client.models.generate_content,
                     model='gemini-2.5-flash',
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json"
-                    )
+                    contents=prompt
                 )
-                actions = json.loads(response.text)
+                
+                # Parse response, cleaning up markdown code blocks if the model wrapped it
+                res_text = response.text.strip()
+                if res_text.startswith("```"):
+                    lines = res_text.splitlines()
+                    if lines[0].startswith("```"):
+                        lines = lines[1:]
+                    if lines and lines[-1].startswith("```"):
+                        lines = lines[:-1]
+                    res_text = "\n".join(lines).strip()
+
+                actions = json.loads(res_text)
 
                 # Process actions
                 for act in actions:
