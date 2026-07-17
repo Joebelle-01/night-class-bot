@@ -146,6 +146,67 @@ user_message_timestamps = defaultdict(list)
 SPAM_LIMIT = 5  # Max messages
 SPAM_WINDOW = 3.0  # seconds
 
+async def configure_category_permissions(guild, category, force_all_roles=False):
+    everyone = guild.default_role
+    overwrites = category.overwrites.copy()
+    
+    # 1. Deny view_channel for @everyone
+    everyone_overwrite = overwrites.get(everyone, discord.PermissionOverwrite())
+    everyone_overwrite.view_channel = False
+    overwrites[everyone] = everyone_overwrite
+    
+    # 2. Determine which roles should have access
+    target_roles = []
+    is_general_or_gaming = "gaming" in category.name.lower() or force_all_roles
+    
+    if is_general_or_gaming:
+        # General/Gaming category: grant access to all SELECTOR_ROLES
+        for r_id in SELECTOR_ROLES.values():
+            role = guild.get_role(r_id)
+            if role:
+                target_roles.append(role)
+    else:
+        # Course category: check if it matches a specific role key
+        role_key = find_matching_role_key(category.name)
+        if role_key:
+            role_id = SELECTOR_ROLES[role_key]
+            role = guild.get_role(role_id)
+            if role:
+                target_roles.append(role)
+                
+    if not target_roles and not is_general_or_gaming:
+        return False, f"Category '{category.name}' is not a gaming or course-specific category."
+        
+    # 3. Apply permissions for the target roles
+    for role in target_roles:
+        role_overwrite = overwrites.get(role, discord.PermissionOverwrite())
+        role_overwrite.view_channel = True
+        role_overwrite.connect = True
+        role_overwrite.speak = True
+        role_overwrite.send_messages = True
+        role_overwrite.read_message_history = True
+        overwrites[role] = role_overwrite
+        
+    try:
+        await category.edit(overwrites=overwrites)
+        
+        # 4. Sync channels
+        synced_count = 0
+        for channel in category.channels:
+            try:
+                await channel.edit(sync_permissions=True)
+                synced_count += 1
+            except Exception as ch_err:
+                print(f"[Permissions] Error syncing channel {channel.name}: {ch_err}")
+                
+        if is_general_or_gaming:
+            return True, f"Configured general/gaming category **{category.name}** for all roles (synced {synced_count} channels)"
+        else:
+            role_names = ", ".join(r.name for r in target_roles)
+            return True, f"Configured category **{category.name}** for role **{role_names}** (synced {synced_count} channels)"
+    except Exception as e:
+        return False, f"Failed to configure category **{category.name}**: {e}"
+
 @bot.event
 async def on_ready():
     print(f"Bot online: {bot.user}")
@@ -157,36 +218,20 @@ async def on_ready():
             print(f"Position {role.position}: {role.name} (ID: {role.id})")
         print("---------------------------------------------------\n")
         
+        # Print all categories and channels to assist debugging
+        print(f"\n--- Categories and Channels in Guild ---")
+        for category in guild.categories:
+            print(f"Category: {category.name} (ID: {category.id})")
+            for channel in category.channels:
+                print(f"  - {channel.name} (ID: {channel.id}, Type: {channel.type})")
+        print("---------------------------------------------------\n")
+        
         # Automatically fix channel permissions on startup
         print("Starting auto-configuration of channel permissions...")
-        everyone = guild.default_role
         for category in guild.categories:
-            role_key = find_matching_role_key(category.name)
-            if role_key:
-                role_id = SELECTOR_ROLES[role_key]
-                role = guild.get_role(role_id)
-                if role:
-                    try:
-                        overwrites = category.overwrites.copy()
-                        
-                        everyone_overwrite = overwrites.get(everyone, discord.PermissionOverwrite())
-                        everyone_overwrite.view_channel = False
-                        overwrites[everyone] = everyone_overwrite
-                        
-                        role_overwrite = overwrites.get(role, discord.PermissionOverwrite())
-                        role_overwrite.view_channel = True
-                        overwrites[role] = role_overwrite
-                        
-                        await category.edit(overwrites=overwrites)
-                        print(f"[Auto-Permissions] Configured category {category.name} for role {role.name}")
-                        
-                        for channel in category.channels:
-                            try:
-                                await channel.edit(sync_permissions=True)
-                            except Exception as ch_err:
-                                print(f"[Auto-Permissions] Error syncing channel {channel.name}: {ch_err}")
-                    except Exception as e:
-                        print(f"[Auto-Permissions] Failed to configure category {category.name}: {e}")
+            success, msg = await configure_category_permissions(guild, category)
+            if success:
+                print(f"[Auto-Permissions] {msg}")
         print("Auto-configuration of channel permissions complete.")
     else:
         print(f"\n[Warning] Guild with ID {GUILD_ID} not found or bot is not in it.\n")
@@ -274,53 +319,54 @@ async def on_message(message: discord.Message):
         async with message.channel.typing():
             log_messages = []
             guild = message.guild
-            everyone = guild.default_role
 
             for category in guild.categories:
-                role_key = find_matching_role_key(category.name)
-                if role_key:
-                    role_id = SELECTOR_ROLES[role_key]
-                    role = guild.get_role(role_id)
-                    if role:
-                        try:
-                            # Update overwrites dictionary copy to preserve other roles/bot overrides
-                            overwrites = category.overwrites.copy()
-                            
-                            # Update everyone override
-                            everyone_overwrite = overwrites.get(everyone, discord.PermissionOverwrite())
-                            everyone_overwrite.view_channel = False
-                            overwrites[everyone] = everyone_overwrite
-                            
-                            # Update target role override
-                            role_overwrite = overwrites.get(role, discord.PermissionOverwrite())
-                            role_overwrite.view_channel = True
-                            overwrites[role] = role_overwrite
-                            
-                            await category.edit(overwrites=overwrites)
-                            log_messages.append(f"✅ Configured private overrides on category **{category.name}** for role **{role.name}**")
-                            
-                            # Sync channels in the category
-                            synced_count = 0
-                            for channel in category.channels:
-                                try:
-                                    await channel.edit(sync_permissions=True)
-                                    synced_count += 1
-                                except Exception as ch_err:
-                                    print(f"Error syncing channel {channel.name}: {ch_err}")
-                            if synced_count > 0:
-                                log_messages.append(f"   ↳ Synced permissions for {synced_count} channel(s) inside **{category.name}**")
-                        except Exception as e:
-                            log_messages.append(f"❌ Failed to configure category **{category.name}**: {e}")
-                    else:
-                        log_messages.append(f"⚠️ Found match for category **{category.name}** but role ID `{role_id}` not found in server.")
+                success, msg = await configure_category_permissions(guild, category)
+                if success:
+                    log_messages.append(msg)
             
             if not log_messages:
-                await message.channel.send("ℹ️ No matching categories found. Please name your categories containing the course acronym (e.g. 'BSIT', 'BSFT', 'Chemistry').")
+                await message.channel.send("ℹ️ No managed categories (gaming or course-specific) found in this server.")
             else:
                 response_text = "\n".join(log_messages)
                 if len(response_text) > 2000:
                     response_text = response_text[:1990] + "\n..."
                 await message.channel.send(response_text)
+        return
+
+    # 1c. Unlock Category Command
+    if content.startswith("!unlockcategory") or content.startswith("!unlock_category"):
+        # Check permissions: Only Server Owner or Administrator role can run commands
+        member = message.author
+        is_admin = member.guild_permissions.administrator or member.id == message.guild.owner_id
+        if not is_admin:
+            await message.channel.send("❌ Sorry, only administrators can run this command.")
+            return
+
+        parts = content.split(" ", 1)
+        if len(parts) < 2:
+            await message.channel.send("ℹ️ Usage: `!unlockcategory <category name or ID>`")
+            return
+
+        category_name = parts[1].strip()
+        guild = message.guild
+        category = None
+
+        if category_name.isdigit():
+            category = discord.utils.get(guild.categories, id=int(category_name))
+        else:
+            category = discord.utils.get(guild.categories, name=category_name)
+            if not category:
+                # Case insensitive partial match
+                category = next((c for c in guild.categories if category_name.lower() in c.name.lower()), None)
+
+        if not category:
+            await message.channel.send(f"❌ Category '{category_name}' not found.")
+            return
+
+        async with message.channel.typing():
+            success, msg = await configure_category_permissions(guild, category, force_all_roles=True)
+            await message.channel.send(msg)
         return
 
     # 2. AI Assistant Command Check
