@@ -248,9 +248,10 @@ async def configure_category_permissions(guild: discord.Guild, category: discord
         overwrites[everyone] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
 
     elif cat_type == "info":
-        # INFORMATION category — read-only for all members.
-        # Only Moderator and Admin can post. Verified/Staff can only read.
-        overwrites[everyone] = discord.PermissionOverwrite(view_channel=False)
+        # INFORMATION category — visible to everyone (including new unverified members)
+        # so they can read rules, welcome, and pick-your-role.
+        # Only Moderator and Admin can post. Everyone else is read-only.
+        overwrites[everyone] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
         if verified_role:
             overwrites[verified_role] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
         if staff_role:
