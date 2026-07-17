@@ -8,7 +8,8 @@ from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import discord
 from discord.ext import commands
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # ── CONFIG ──────────────────────────────────────────────
 TOKEN          = os.environ.get("DISCORD_TOKEN")
@@ -70,14 +71,10 @@ ROLE_LABELS = {
 
 # ── GEMINI AI SETUP ──────────────────────────────────────
 if GEMINI_KEY:
-    genai.configure(api_key=GEMINI_KEY)
-    ai_model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        generation_config={"response_mime_type": "application/json"}
-    )
-    print("[OK] Gemini AI configured.")
+    ai_client = genai.Client(api_key=GEMINI_KEY)
+    print("[OK] Gemini AI configured using google-genai SDK.")
 else:
-    ai_model = None
+    ai_client = None
     print("[WARN] GEMINI_API_KEY environment variable is missing. AI commands will be disabled.")
 
 # ── KEEP-ALIVE SERVER ────────────────────────────────────
@@ -185,7 +182,7 @@ async def on_message(message: discord.Message):
             await message.channel.send("❌ Sorry, only administrators can command me.")
             return
 
-        if not ai_model:
+        if not ai_client:
             await message.channel.send("❌ AI functionality is currently offline (API key missing).")
             return
 
@@ -227,8 +224,15 @@ async def on_message(message: discord.Message):
             prompt = f"System:\n{system_instruction}\n\nUser Request & Context:\n{json.dumps(context)}"
 
             try:
-                # Generate AI response
-                response = await asyncio.to_thread(ai_model.generate_content, prompt)
+                # Generate AI response using new SDK
+                response = await asyncio.to_thread(
+                    ai_client.models.generate_content,
+                    model='gemini-1.5-flash',
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json"
+                    )
+                )
                 actions = json.loads(response.text)
 
                 # Process actions
