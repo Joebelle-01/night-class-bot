@@ -472,11 +472,14 @@ async def on_interaction(interaction: discord.Interaction):
     if custom_id not in SELECTOR_ROLES:
         return
 
+    # Defer immediately because editing roles can take longer than Discord's 3-second timeout limit.
+    await interaction.response.defer(ephemeral=True)
+
     member = interaction.user
     guild  = interaction.guild
 
     if not member or not guild:
-        await interaction.response.send_message("Error: could not find your profile.", ephemeral=True)
+        await interaction.followup.send("Error: could not find your profile.", ephemeral=True)
         return
 
     # ── Step 1: Remove all existing selector roles ─────────
@@ -490,7 +493,7 @@ async def on_interaction(interaction: discord.Interaction):
     # ── Step 2: Add the new program role ───────────────────
     new_program_role = guild.get_role(SELECTOR_ROLES[custom_id])
     if not new_program_role:
-        await interaction.response.send_message("Role not found in the server. Please contact an admin.", ephemeral=True)
+        await interaction.followup.send("Role not found in the server. Please contact an admin.", ephemeral=True)
         return
     new_roles.append(new_program_role)
 
@@ -511,20 +514,20 @@ async def on_interaction(interaction: discord.Interaction):
         await member.edit(roles=new_roles)
 
         college_display = f" ({college_name})" if college_name else ""
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✅ You now have the **{ROLE_LABELS[custom_id]}**{college_display} role and full server access! 🎉",
             ephemeral=True
         )
         print(f"[Role Selector] {member.display_name} → {ROLE_LABELS[custom_id]}{college_display} + Verified")
     except discord.Forbidden:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "❌ Error: I do not have permission to manage this role. "
             "Please ask an administrator to move my bot's role ABOVE the program roles in Server Settings.",
             ephemeral=True
         )
         print(f"[Role Selector Error] Cannot manage role {new_program_role.name} due to hierarchy limitations.")
     except Exception as e:
-        await interaction.response.send_message(f"❌ Error updating roles: {e}", ephemeral=True)
+        await interaction.followup.send(f"❌ Error updating roles: {e}", ephemeral=True)
         print(f"[Role Selector Error] {e}")
 
 
