@@ -69,6 +69,48 @@ ROLE_LABELS = {
     "role_guest": "Guest",
 }
 
+def find_matching_role_key(name: str):
+    name = name.lower()
+    # Normalize name (remove spaces, hyphens, etc.)
+    norm = "".join(c for c in name if c.isalnum())
+    
+    # Check exact abbreviation matches first (e.g. bscs, bsit, bschem)
+    for key in SELECTOR_ROLES.keys():
+        abbr = key.replace("role_", "") # e.g. bscs, bsit
+        if abbr in norm:
+            return key
+            
+    # Check keyword matches
+    keywords = {
+        "role_bsa": ["architecture", "bsa"],
+        "role_bsce": ["civil", "bsce"],
+        "role_bscpe": ["computereng", "bscpe", "cpe"],
+        "role_bsee": ["electrical", "bsee", "ee"],
+        "role_bsece": ["electronicseng", "bsece", "ece"],
+        "role_bsge": ["geodetic", "bsge"],
+        "role_bsme": ["mechanical", "bsme", "me"],
+        "role_bsmet": ["manufacturing", "bsmet"],
+        "role_bscs": ["computerscience", "bscs", "cs"],
+        "role_bsit": ["informationtech", "bsit", "it"],
+        "role_bsds": ["datascience", "bsds", "ds"],
+        "role_bstcm": ["techcomm", "bstcm", "tcm"],
+        "role_bsam": ["appliedmath", "bsam", "math"],
+        "role_bsap": ["appliedphys", "bsap", "physics"],
+        "role_bschem": ["chemistry", "bschem", "chem"],
+        "role_bses": ["environmental", "bses", "es"],
+        "role_bsft": ["foodtech", "bsft", "ft"],
+        "role_bsauto": ["autotronics", "bsauto"],
+        "role_bsetech": ["electech", "bsetech"],
+        "role_bsesm": ["energysystems", "bsesm"],
+        "role_bsemt": ["electromechanical", "bsemt"],
+        "role_btom": ["btom", "operationsmanagement"]
+    }
+    for key, words in keywords.items():
+        for word in words:
+            if word in norm:
+                return key
+    return None
+
 # ── GEMINI AI SETUP ──────────────────────────────────────
 if GEMINI_KEY:
     ai_client = genai.Client(api_key=GEMINI_KEY)
@@ -185,6 +227,68 @@ async def on_message(message: discord.Message):
             print(f"[Anti-Spam] Timed out {message.author.display_name}")
         except Exception as e:
             print(f"[Anti-Spam] Failed to mute: {e}")
+        return
+
+    # 1b. Fix Permissions Command
+    content = message.content.strip()
+    if content.startswith("!fixpermissions"):
+        # Check permissions: Only Server Owner or Administrator role can run commands
+        member = message.author
+        is_admin = member.guild_permissions.administrator or member.id == message.guild.owner_id
+        if not is_admin:
+            await message.channel.send("❌ Sorry, only administrators can run this command.")
+            return
+
+        async with message.channel.typing():
+            log_messages = []
+            guild = message.guild
+            everyone = guild.default_role
+
+            for category in guild.categories:
+                role_key = find_matching_role_key(category.name)
+                if role_key:
+                    role_id = SELECTOR_ROLES[role_key]
+                    role = guild.get_role(role_id)
+                    if role:
+                        try:
+                            # Update overwrites dictionary copy to preserve other roles/bot overrides
+                            overwrites = category.overwrites.copy()
+                            
+                            # Update everyone override
+                            everyone_overwrite = overwrites.get(everyone, discord.PermissionOverwrite())
+                            everyone_overwrite.view_channel = False
+                            overwrites[everyone] = everyone_overwrite
+                            
+                            # Update target role override
+                            role_overwrite = overwrites.get(role, discord.PermissionOverwrite())
+                            role_overwrite.view_channel = True
+                            overwrites[role] = role_overwrite
+                            
+                            await category.edit(overwrites=overwrites)
+                            log_messages.append(f"✅ Configured private overrides on category **{category.name}** for role **{role.name}**")
+                            
+                            # Sync channels in the category
+                            synced_count = 0
+                            for channel in category.channels:
+                                try:
+                                    await channel.edit(sync_permissions=True)
+                                    synced_count += 1
+                                except Exception as ch_err:
+                                    print(f"Error syncing channel {channel.name}: {ch_err}")
+                            if synced_count > 0:
+                                log_messages.append(f"   ↳ Synced permissions for {synced_count} channel(s) inside **{category.name}**")
+                        except Exception as e:
+                            log_messages.append(f"❌ Failed to configure category **{category.name}**: {e}")
+                    else:
+                        log_messages.append(f"⚠️ Found match for category **{category.name}** but role ID `{role_id}` not found in server.")
+            
+            if not log_messages:
+                await message.channel.send("ℹ️ No matching categories found. Please name your categories containing the course acronym (e.g. 'BSIT', 'BSFT', 'Chemistry').")
+            else:
+                response_text = "\n".join(log_messages)
+                if len(response_text) > 2000:
+                    response_text = response_text[:1990] + "\n..."
+                await message.channel.send(response_text)
         return
 
     # 2. AI Assistant Command Check
