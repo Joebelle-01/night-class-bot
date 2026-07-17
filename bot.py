@@ -71,8 +71,8 @@ ROLE_LABELS = {
 
 # ── GEMINI AI SETUP ──────────────────────────────────────
 if GEMINI_KEY:
-    ai_client = genai.Client(api_key=GEMINI_KEY, http_options={'api_version': 'v1'})
-    print("[OK] Gemini AI configured using stable v1 API version.")
+    ai_client = genai.Client(api_key=GEMINI_KEY)
+    print("[OK] Gemini AI configured using google-genai SDK.")
 else:
     ai_client = None
     print("[WARN] GEMINI_API_KEY environment variable is missing. AI commands will be disabled.")
@@ -246,7 +246,7 @@ async def on_message(message: discord.Message):
                 # Generate AI response using new SDK
                 response = await asyncio.to_thread(
                     ai_client.models.generate_content,
-                    model='gemini-1.5-flash',
+                    model='gemini-2.5-flash',
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json"
