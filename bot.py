@@ -71,8 +71,8 @@ ROLE_LABELS = {
 
 # ── GEMINI AI SETUP ──────────────────────────────────────
 if GEMINI_KEY:
-    ai_client = genai.Client(api_key=GEMINI_KEY)
-    print("[OK] Gemini AI configured using google-genai SDK.")
+    ai_client = genai.Client(api_key=GEMINI_KEY, http_options={'api_version': 'v1'})
+    print("[OK] Gemini AI configured using stable v1 API version.")
 else:
     ai_client = None
     print("[WARN] GEMINI_API_KEY environment variable is missing. AI commands will be disabled.")
