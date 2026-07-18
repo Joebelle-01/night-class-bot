@@ -427,6 +427,36 @@ async def configure_public_channels(guild: discord.Guild) -> list[str]:
     return results
 
 
+async def ensure_movie_lounge_channel(guild: discord.Guild) -> str:
+    """
+    Ensures that a voice channel named '🎥・Movie Lounge' exists under the 
+    'gaming voice channels' category.
+    """
+    # Find the category (gaming voice channels keyword match)
+    category = discord.utils.find(
+        lambda c: "gaming voice" in c.name.lower(),
+        guild.categories
+    )
+    if not category:
+        return "⚠️ Category matching 'gaming voice' not found."
+
+    # Check if the channel already exists in this category
+    existing_channel = discord.utils.find(
+        lambda ch: "movie lounge" in ch.name.lower() and ch.type == discord.ChannelType.voice,
+        category.channels
+    )
+
+    if existing_channel:
+        return f"ℹ️ Voice channel '{existing_channel.name}' already exists under '{category.name}'."
+
+    # Create the channel
+    try:
+        new_channel = await category.create_voice_channel(name="🎥・Movie Lounge")
+        return f"✅ Created voice channel '{new_channel.name}' under '{category.name}'."
+    except Exception as e:
+        return f"❌ Failed to create voice channel under '{category.name}': {e}"
+
+
 # ── BOT EVENTS ───────────────────────────────────────────
 @bot.event
 async def on_ready():
@@ -452,6 +482,10 @@ async def on_ready():
 
     # Auto-configure permissions on startup
     print("Starting auto-configuration of channel permissions...")
+
+    # 0. Ensure movie lounge voice channel exists
+    movie_msg = await ensure_movie_lounge_channel(guild)
+    print(f"[Movie Lounge] {movie_msg}")
 
     # 1. Fix the four public channels first
     public_results = await configure_public_channels(guild)
@@ -573,6 +607,10 @@ async def on_message(message: discord.Message):
         async with message.channel.typing():
             guild   = message.guild
             results = []
+
+            # Ensure Movie Lounge channel exists
+            movie_msg = await ensure_movie_lounge_channel(guild)
+            results.append(movie_msg)
 
             # Fix public channels
             public_results = await configure_public_channels(guild)
