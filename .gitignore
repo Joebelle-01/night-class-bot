@@ -4,3 +4,4 @@ wintun.dll
 fly.toml
 __pycache__/
 *.pyc
+.env

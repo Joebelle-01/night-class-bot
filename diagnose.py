@@ -11,9 +11,12 @@ import os
 import sys
 import asyncio
 import discord
+from dotenv import load_dotenv
 
 # Force UTF-8 output on Windows to handle emoji in role names
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+load_dotenv()
 
 TOKEN    = os.environ.get("DISCORD_TOKEN")
 GUILD_ID = int(os.environ.get("GUILD_ID", "1527309915188891789"))

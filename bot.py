@@ -10,6 +10,10 @@ import discord
 from discord.ext import commands
 from google import genai
 from google.genai import types
+from dotenv import load_dotenv
+
+# Load .env file if it exists
+load_dotenv()
 
 # ── CONFIG ──────────────────────────────────────────────
 TOKEN          = os.environ.get("DISCORD_TOKEN")
